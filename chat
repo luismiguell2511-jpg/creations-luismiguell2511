@@ -1,0 +1,89 @@
+import tkinter as tk
+import pyperclip
+import socket
+import asyncio
+
+s = None
+msg = ""
+
+async def sync():
+    global s
+    HOST = '127.0.0.1'
+    PORT = 8888
+
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.connect((HOST, PORT))  # Conecta ao servidor
+        print("Conectado ao servidor!")
+    except Exception as e:
+        print(f"Erro ao conectar: {e}")
+        
+async def receber():
+    global msg, s
+    while True:
+        try:
+            msg = await asyncio.get_event_loop().run_in_executor(None, lambda: s.recv(1024).decode())
+            if msg:
+                print(f"recebeu: {msg}")
+        except Exception as e:
+            print(f"Erro ao receber: {e}")
+            break
+        await asyncio.sleep(0.1)
+
+def tela():
+    global msg, s
+    app=tk.Tk()
+    app.title("chat")
+    app.geometry("300x200")
+    
+    #funções
+    def enter(event):
+        try:
+            mensagem = chat.get()
+            if mensagem:
+                s.sendall(mensagem.encode('utf-8'))
+                print(f"enviou: {mensagem}")
+                chat.delete(0, tk.END)
+        except Exception as e:
+            print(f"Erro ao enviar: {e}")
+    
+    def fechar(event):
+        app.destroy()
+    
+    def paste(event):
+        pyperclip.copy(msg)
+        print("texto copiado")
+    
+    def atualizar():
+        recebe.config(text=f"recebe: {msg}")
+        app.after(100, atualizar)
+    
+    #elementos
+    txt=tk.Label(app, text="chat client, aperte enter para enviar")
+    txt.pack(ipadx=20,ipady=5,side="top")
+
+    chat=tk.Entry(app)
+    chat.pack(padx=20,ipady=5,pady=20,side="bottom")
+
+    recebe=tk.Label(app, text=f"recebe:{msg}")
+    recebe.pack(padx=20,ipady=200/2)
+    
+    #keybinds
+    app.bind("<Return>", enter)
+    app.bind("<Escape>", fechar)
+    app.bind("<Control-a>", paste)
+    
+    atualizar()
+    app.mainloop()
+
+async def run():
+    await sync()
+    asyncio.create_task(receber())
+    try:
+        await asyncio.get_event_loop().run_in_executor(None, tela)
+    except:
+        pass
+    # Mantém o event loop rodando para receber continuar funcionando
+    await asyncio.sleep(float('inf'))
+
+asyncio.run(run())
